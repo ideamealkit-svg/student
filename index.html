@@ -36,7 +36,7 @@
       </div>
       
       <div class="nav-actions">
-        <button id="openRegisterModalBtn" class="btn btn-primary glow-btn">
+        <button id="openRegisterModalBtn" class="btn btn-primary glow-btn" onclick="window.openRegisterModal && window.openRegisterModal()">
           <i class="fa-solid fa-plus"></i> 내 홈페이지 등록하기
         </button>
       </div>
@@ -132,7 +132,7 @@
         <div class="empty-icon"><i class="fa-solid fa-folder-open"></i></div>
         <h4>조건에 맞는 홈페이지가 없습니다</h4>
         <p>검색어를 변경하거나 첫 번째 홈페이지를 등록해 보세요!</p>
-        <button id="emptyStateBtn" class="btn btn-primary glow-btn margin-top-1">
+        <button id="emptyStateBtn" class="btn btn-primary glow-btn margin-top-1" onclick="window.openRegisterModal && window.openRegisterModal()">
           <i class="fa-solid fa-plus"></i> 지금 등록하기
         </button>
       </div>
@@ -155,12 +155,12 @@
           <i class="fa-solid fa-laptop-code"></i>
           <h3>내 홈페이지 등록하기</h3>
         </div>
-        <button id="closeModalBtn" class="close-modal-btn" aria-label="닫기">
+        <button id="closeModalBtn" class="close-modal-btn" aria-label="닫기" onclick="window.closeRegisterModal && window.closeRegisterModal()">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <form id="registerForm" class="modal-form">
+      <form id="registerForm" class="modal-form" onsubmit="window.handleRegisterSubmit && window.handleRegisterSubmit(event); return false;">
         <!-- Student Name -->
         <div class="form-group">
           <label for="studentName"><i class="fa-solid fa-user"></i> 수강생 이름 <span class="required">*</span></label>
@@ -216,7 +216,7 @@
 
         <!-- Submit Actions -->
         <div class="modal-actions">
-          <button type="button" id="cancelRegisterBtn" class="btn btn-secondary">취소</button>
+          <button type="button" id="cancelRegisterBtn" class="btn btn-secondary" onclick="window.closeRegisterModal && window.closeRegisterModal()">취소</button>
           <button type="submit" id="submitRegisterBtn" class="btn btn-primary glow-btn">
             <i class="fa-solid fa-paper-plane"></i> 등록하기
           </button>

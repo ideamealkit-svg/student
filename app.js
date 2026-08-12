@@ -8,8 +8,6 @@ import {
   collection, 
   addDoc, 
   onSnapshot, 
-  query, 
-  orderBy, 
   doc, 
   updateDoc, 
   increment 
@@ -80,6 +78,11 @@ let registerModal, openRegisterModalBtn, closeModalBtn, cancelRegisterBtn, empty
 let totalSitesCount, totalStudentsCount, totalLikesCount;
 let toast, toastMsg, toastIcon;
 
+// Global Window Helpers (for fail-safe inline HTML triggers)
+window.openRegisterModal = openModal;
+window.closeRegisterModal = closeModal;
+window.handleRegisterSubmit = handleFormSubmit;
+
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
@@ -122,7 +125,7 @@ function getDomElements() {
 }
 
 /**
- * Initialize Data (LocalStorage + Firebase Cloud Realtime Listener)
+ * Initialize Data (LocalStorage + Firebase Realtime Listener without index requirements)
  */
 function initData() {
   const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -137,28 +140,29 @@ function initData() {
     saveToLocalStorage();
   }
 
-  // Render immediately for fast load
+  // Render initial UI fast
   renderApp();
 
-  // Firebase Real-time Cloud Sync
+  // Firebase Real-time Cloud Sync (Simple query without index requirement)
   if (isFirebaseEnabled && db) {
     try {
-      const q = query(collection(db, "sites"), orderBy("createdAt", "desc"));
-      onSnapshot(q, (snapshot) => {
+      onSnapshot(collection(db, "sites"), (snapshot) => {
         const cloudSites = [];
         snapshot.forEach((docSnap) => {
           cloudSites.push({ id: docSnap.id, ...docSnap.data() });
         });
         if (cloudSites.length > 0) {
+          // Sort client-side so no Firestore index is required
+          cloudSites.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
           sitesList = cloudSites;
           saveToLocalStorage();
           renderApp();
         }
       }, (err) => {
-        console.warn("Firestore listener error (ensure Rules allow read/write):", err.message);
+        console.warn("Firestore listener warning:", err.message);
       });
     } catch (e) {
-      console.warn("Firestore query setup error:", e);
+      console.warn("Firestore collection setup error:", e);
     }
   }
 }
@@ -241,6 +245,7 @@ function bindEvents() {
 }
 
 function openModal() {
+  if (!registerModal) getDomElements();
   if (registerModal) {
     registerModal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
@@ -250,6 +255,7 @@ function openModal() {
 }
 
 function closeModal() {
+  if (!registerModal) getDomElements();
   if (registerModal) {
     registerModal.style.display = 'none';
     document.body.style.overflow = 'auto';
@@ -276,10 +282,10 @@ function formatUrl(url) {
 }
 
 /**
- * Form Submit Handler (Instant Response + Cloud Firestore Push)
+ * Form Submit Handler (Fail-safe Instant Update & Async Firestore Push)
  */
 function handleFormSubmit(e) {
-  if (e) e.preventDefault();
+  if (e && e.preventDefault) e.preventDefault();
 
   const studentNameInput = document.getElementById('studentName');
   const siteTitleInput = document.getElementById('siteTitle');
@@ -296,7 +302,7 @@ function handleFormSubmit(e) {
 
   if (!studentName || !siteTitle || !rawUrl) {
     showToast('필수 항목(이름, 홈페이지명, 주소)을 모두 입력해 주세요.', 'warning');
-    return;
+    return false;
   }
 
   const formattedUrl = formatUrl(rawUrl);
@@ -329,9 +335,11 @@ function handleFormSubmit(e) {
     }).then(docRef => {
       console.log("🔥 Firestore cloud save successful, ID:", docRef.id);
     }).catch(err => {
-      console.warn("Firestore cloud save error (ensure Firestore Rules allow read/write):", err.message);
+      console.warn("Firestore cloud save error:", err.message);
     });
   }
+
+  return false;
 }
 
 function handleLike(id) {
@@ -521,6 +529,7 @@ function renderApp() {
 }
 
 function showToast(msg, type = 'success') {
+  if (!toast || !toastMsg || !toastIcon) getDomElements();
   if (!toast || !toastMsg || !toastIcon) return;
 
   toastMsg.textContent = msg;
