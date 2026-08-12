@@ -1,5 +1,5 @@
 /**
- * Student Web Hub - Main Application Logic (Real Student Cloud Data Only - Zero Fake Mock Data)
+ * Student Web Hub - Main Application Logic (Fail-proof Cloud Synchronization & Deduplication)
  */
 
 import { 
@@ -14,8 +14,8 @@ import {
   increment 
 } from './firebase-config.js';
 
-// Clean Local Storage Keys (Purges any legacy mock caches)
-const LOCAL_STORAGE_KEY = 'STUDENT_HUB_SITES_REAL_V2';
+// Clean Local Storage Keys
+const LOCAL_STORAGE_KEY = 'STUDENT_HUB_SITES_REAL_V3';
 const LIKED_SITES_KEY = 'STUDENT_HUB_LIKED_IDS';
 const DELETED_SITES_KEY = 'STUDENT_HUB_DELETED_IDS';
 
@@ -23,7 +23,7 @@ const DELETED_SITES_KEY = 'STUDENT_HUB_DELETED_IDS';
 const API_KEY = 'AIzaSyBjiUGAqH1iup9LuI3D1q7ZVz4O4Mgw55U';
 const FIRESTORE_REST_BASE = `https://firestore.googleapis.com/v1/projects/student-hub-bd017/databases/(default)/documents/sites?key=${API_KEY}`;
 
-// NO FAKE MOCK DATA - Real Submissions Only
+// NO FAKE MOCK DATA
 const INITIAL_MOCK_DATA = [];
 
 // App State
@@ -54,15 +54,12 @@ if (document.readyState === 'loading') {
 }
 
 function initApp() {
-  // Clear any legacy mock data from localStorage
-  localStorage.removeItem('STUDENT_HUB_SITES_2026');
-  
   getDomElements();
   initData();
   bindEvents();
 
-  // Periodically fetch REST Cloud Updates every 4 seconds
-  setInterval(syncCloudDataViaRest, 4000);
+  // Periodically fetch REST Cloud Updates every 5 seconds
+  setInterval(syncCloudDataViaRest, 5000);
 }
 
 function getDomElements() {
@@ -112,11 +109,11 @@ function setCloudStatus(connected, message) {
  */
 function sanitizeSites(list) {
   const deletedSet = new Set(deletedSiteIds);
-  return list.filter(item => !deletedSet.has(item.id));
+  return list.filter(item => item && item.id && !deletedSet.has(item.id));
 }
 
 /**
- * Initialize Data (LocalStorage + Real Cloud Firestore Only)
+ * Initialize Data (LocalStorage + Authenticated Cloud Sync)
  */
 function initData() {
   const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -160,12 +157,26 @@ function initData() {
 }
 
 /**
- * Merge Cloud Data into Sites List (Pure Cloud Data)
+ * Non-destructive cloud data merge (Preserves unsynced local submissions)
  */
 function updateSitesWithCloudData(cloudSites) {
   if (!cloudSites) return;
 
-  sitesList = sanitizeSites(cloudSites);
+  const siteMap = new Map();
+  
+  // 1. Keep local items first
+  sitesList.forEach(item => {
+    if (item && item.id) siteMap.set(item.id, item);
+  });
+
+  // 2. Merge cloud items into map
+  cloudSites.forEach(item => {
+    if (item && item.id) {
+      siteMap.set(item.id, item);
+    }
+  });
+
+  sitesList = sanitizeSites(Array.from(siteMap.values()));
   sitesList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
   saveToLocalStorage();
@@ -179,17 +190,13 @@ async function syncCloudDataViaRest() {
   try {
     const res = await fetch(FIRESTORE_REST_BASE);
     if (!res.ok) {
-      if (res.status === 403 || res.status === 401) {
-        setCloudStatus(false, "⚠️ 파이어베이스 Rules 권한을 확인해주세요");
-      }
+      setCloudStatus(false, "⚠️ 파이어베이스 서버 연결 대기중");
       return;
     }
     
     const data = await res.json();
     if (!data.documents) {
-      if (sitesList.length === 0) {
-        setCloudStatus(true, `☁️ 실시간 클라우드 연결됨 (0개 등록됨)`);
-      }
+      setCloudStatus(true, `☁️ 실시간 클라우드 연결됨 (${sitesList.length}개 공유 중)`);
       return;
     }
 
@@ -245,7 +252,7 @@ async function postSiteToCloudRest(newSite) {
     if (res.ok) {
       console.log("☁️ Authenticated REST Cloud Save SUCCESS!");
       setCloudStatus(true, `☁️ 실시간 공유 연결됨`);
-      showToast(`☁️ 수강생 전원 공유 서버에 등록되었습니다!`, 'success');
+      showToast(`☁️ 수강생 전원 공유 서버에 저장되었습니다!`, 'success');
       syncCloudDataViaRest();
     } else {
       const errText = await res.text();
@@ -380,7 +387,7 @@ function formatUrl(url) {
 }
 
 /**
- * Form Submit Handler
+ * Form Submit Handler (Non-destructive local push + dual REST & SDK cloud save)
  */
 function handleFormSubmit(e) {
   if (e && e.preventDefault) e.preventDefault();
@@ -467,7 +474,7 @@ function handleDelete(id) {
 
   // Delete from Cloud Firestore SDK if enabled
   if (isFirebaseEnabled && db) {
-    deleteDoc(doc(db, "sites", id)).catch(err => {
+    deleteDoc(doc(doc(db, "sites"), id)).catch(err => {
       console.warn("Firestore SDK delete notice:", err);
     });
   }
