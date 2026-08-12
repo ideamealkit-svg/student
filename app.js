@@ -1,5 +1,5 @@
 /**
- * Student Web Hub - Main Application Logic (Real-time Cloud Sync)
+ * Student Web Hub - Main Application Logic (Real-time Cloud Sync + Delete Feature)
  */
 
 import { 
@@ -10,6 +10,7 @@ import {
   onSnapshot, 
   doc, 
   updateDoc, 
+  deleteDoc,
   increment 
 } from './firebase-config.js';
 
@@ -155,7 +156,6 @@ function initData() {
 
         // Merge cloud items with initial mock data if cloud is empty
         if (cloudSites.length > 0) {
-          // Combine unique items (Cloud items first, then local mock items)
           const cloudIds = new Set(cloudSites.map(c => c.id));
           const mockTail = INITIAL_MOCK_DATA.filter(m => !cloudIds.has(m.id));
           
@@ -326,7 +326,7 @@ function handleFormSubmit(e) {
   
   closeModal();
   renderApp();
-  showToast(`🎉 ${studentName}님의 홈페이지가 클라우드에 등록되었습니다!`, 'success');
+  showToast(`🎉 ${studentName}님의 홈페이지가 등록되었습니다!`, 'success');
 
   // 2. Broadcast to Firebase Cloud Firestore for all students to see live
   if (isFirebaseEnabled && db) {
@@ -337,13 +337,36 @@ function handleFormSubmit(e) {
       console.log("☁️ Firestore Cloud save SUCCESS, Document ID:", docRef.id);
     }).catch(err => {
       console.error("⚠️ Firestore Cloud save ERROR:", err);
-      if (err.message && err.message.includes('permission-denied')) {
-        showToast('⚠️ 파이어베이스 권한 적용 대기 중입니다 (1~2분 후 동기화됩니다)', 'warning');
-      }
     });
   }
 
   return false;
+}
+
+/**
+ * Handle Delete Site Card
+ */
+function handleDelete(id) {
+  const targetSite = sitesList.find(s => s.id === id);
+  if (!targetSite) return;
+
+  const confirmMsg = `'${targetSite.studentName}' 수강생의 '${targetSite.siteTitle}' 홈페이지를 정말 삭제하시겠습니까?`;
+  if (!confirm(confirmMsg)) return;
+
+  // 1. Update local state & LocalStorage
+  sitesList = sitesList.filter(s => s.id !== id);
+  saveToLocalStorage();
+  renderApp();
+  showToast(`🗑️ ${targetSite.studentName}님의 홈페이지가 삭제되었습니다.`, 'info');
+
+  // 2. Delete from Cloud Firestore if enabled
+  if (isFirebaseEnabled && db && !id.startsWith('mock-')) {
+    deleteDoc(doc(db, "sites", id)).then(() => {
+      console.log("☁️ Firestore document deleted successfully:", id);
+    }).catch(err => {
+      console.warn("Firestore delete error:", err);
+    });
+  }
 }
 
 function handleLike(id) {
@@ -513,6 +536,11 @@ function renderApp() {
                     title="링크 복사">
               <i class="fa-solid fa-share-nodes"></i>
             </button>
+            <button class="action-btn delete-btn" 
+                    data-id="${site.id}" 
+                    title="삭제하기">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
           </div>
         </div>
       </article>
@@ -528,6 +556,12 @@ function renderApp() {
   cardsGrid.querySelectorAll('.share-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       copyLink(btn.dataset.url);
+    });
+  });
+
+  cardsGrid.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      handleDelete(btn.dataset.id);
     });
   });
 }

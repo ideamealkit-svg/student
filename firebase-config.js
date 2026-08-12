@@ -9,6 +9,7 @@ import {
   orderBy, 
   doc, 
   updateDoc, 
+  deleteDoc,
   increment, 
   serverTimestamp 
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
@@ -49,6 +50,7 @@ export {
   orderBy, 
   doc, 
   updateDoc, 
+  deleteDoc,
   increment, 
   serverTimestamp 
 };
