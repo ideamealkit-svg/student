@@ -1,5 +1,5 @@
 /**
- * Student Web Hub - Main Application Logic (Permanent Delete & Real-time Cloud Sync)
+ * Student Web Hub - Main Application Logic (Hybrid Dual Cloud Sync: SDK + REST API)
  */
 
 import { 
@@ -19,7 +19,10 @@ const LOCAL_STORAGE_KEY = 'STUDENT_HUB_SITES_2026';
 const LIKED_SITES_KEY = 'STUDENT_HUB_LIKED_IDS';
 const DELETED_SITES_KEY = 'STUDENT_HUB_DELETED_IDS';
 
-// Initial Mock Data (SEED ONCE ONLY)
+// Direct Firestore REST API Endpoints (Bypasses SDK Offline Failbacks)
+const FIRESTORE_REST_BASE = 'https://firestore.googleapis.com/v1/projects/student-hub-bd017/databases/(default)/documents/sites';
+
+// Initial Mock Data
 const INITIAL_MOCK_DATA = [
   {
     id: 'mock-1',
@@ -98,6 +101,9 @@ function initApp() {
   getDomElements();
   initData();
   bindEvents();
+
+  // Periodically fetch REST Cloud Updates every 6 seconds as dual-backup
+  setInterval(syncCloudDataViaRest, 6000);
 }
 
 function getDomElements() {
@@ -143,7 +149,7 @@ function setCloudStatus(connected, message) {
 }
 
 /**
- * Filter out any deleted IDs permanently
+ * Filter out deleted IDs permanently
  */
 function sanitizeSites(list) {
   const deletedSet = new Set(deletedSiteIds);
@@ -151,7 +157,7 @@ function sanitizeSites(list) {
 }
 
 /**
- * Initialize Data
+ * Initialize Data (LocalStorage + Realtime Cloud Sync)
  */
 function initData() {
   const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -169,7 +175,7 @@ function initData() {
   // Render local state immediately
   renderApp();
 
-  // Firebase Real-time Cloud Sync
+  // Primary: Firebase SDK Real-time Cloud Listener
   if (isFirebaseEnabled && db) {
     try {
       onSnapshot(collection(db, "sites"), (snapshot) => {
@@ -180,26 +186,113 @@ function initData() {
           cloudSites.push({ id: docSnap.id, ...docSnap.data() });
         });
 
-        if (cloudSites.length > 0) {
-          const cloudIds = new Set(cloudSites.map(c => c.id));
-          const mockTail = INITIAL_MOCK_DATA.filter(m => !cloudIds.has(m.id));
-          sitesList = sanitizeSites([...cloudSites, ...mockTail]);
-        } else {
-          sitesList = sanitizeSites(INITIAL_MOCK_DATA);
-        }
-
-        sitesList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-        saveToLocalStorage();
-        renderApp();
+        updateSitesWithCloudData(cloudSites);
       }, (err) => {
-        console.error("⚠️ Firestore Cloud sync error:", err);
-        setCloudStatus(false, `⚠️ 파이어베이스 서버 연결 대기중`);
+        console.warn("⚠️ Firestore SDK listener fallback to REST:", err.message);
+        syncCloudDataViaRest();
       });
     } catch (e) {
-      setCloudStatus(false, `⚠️ 파이어베이스 설정 오류`);
+      syncCloudDataViaRest();
     }
-  } else {
-    setCloudStatus(false, `⚡ 오프라인 저장소 모드`);
+  }
+
+  // Dual Backup: Immediate REST Cloud Sync
+  syncCloudDataViaRest();
+}
+
+/**
+ * Merge Cloud Data into Sites List
+ */
+function updateSitesWithCloudData(cloudSites) {
+  if (!cloudSites || cloudSites.length === 0) return;
+
+  const cloudIds = new Set(cloudSites.map(c => c.id));
+  const mockTail = INITIAL_MOCK_DATA.filter(m => !cloudIds.has(m.id));
+  
+  sitesList = sanitizeSites([...cloudSites, ...mockTail]);
+  sitesList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+  saveToLocalStorage();
+  renderApp();
+}
+
+/**
+ * Direct REST API Cloud Sync (Works on all networks/browsers)
+ */
+async function syncCloudDataViaRest() {
+  try {
+    const res = await fetch(FIRESTORE_REST_BASE);
+    if (!res.ok) {
+      if (res.status === 403 || res.status === 401) {
+        setCloudStatus(false, "⚠️ 파이어베이스 Rules 권한 확인이 필요합니다");
+      }
+      return;
+    }
+    
+    const data = await res.json();
+    if (!data.documents) return;
+
+    const restSites = data.documents.map(docItem => {
+      const fields = docItem.fields || {};
+      const pathParts = docItem.name ? docItem.name.split('/') : [];
+      const docId = pathParts[pathParts.length - 1] || ('site-' + Date.now());
+
+      return {
+        id: docId,
+        studentName: fields.studentName?.stringValue || '수강생',
+        siteTitle: fields.siteTitle?.stringValue || '홈페이지',
+        siteUrl: fields.siteUrl?.stringValue || 'https://github.com',
+        siteCategory: fields.siteCategory?.stringValue || '기타',
+        avatar: fields.avatar?.stringValue || '👨‍💻',
+        siteDescription: fields.siteDescription?.stringValue || '',
+        likes: parseInt(fields.likes?.integerValue || '1', 10),
+        createdAt: parseInt(fields.createdAt?.integerValue || Date.now(), 10)
+      };
+    });
+
+    setCloudStatus(true, `☁️ 실시간 클라우드 연결됨 (${restSites.length}개 전체 공유)`);
+    updateSitesWithCloudData(restSites);
+  } catch (e) {
+    console.warn("REST Sync notice:", e);
+  }
+}
+
+/**
+ * Direct REST API POST (Broadcast to Google Cloud Firestore)
+ */
+async function postSiteToCloudRest(newSite) {
+  try {
+    const payload = {
+      fields: {
+        studentName: { stringValue: newSite.studentName },
+        siteTitle: { stringValue: newSite.siteTitle },
+        siteUrl: { stringValue: newSite.siteUrl },
+        siteCategory: { stringValue: newSite.siteCategory },
+        avatar: { stringValue: newSite.avatar },
+        siteDescription: { stringValue: newSite.siteDescription },
+        likes: { integerValue: String(newSite.likes || 1) },
+        createdAt: { integerValue: String(newSite.createdAt || Date.now()) }
+      }
+    };
+
+    const res = await fetch(FIRESTORE_REST_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      console.log("☁️ Direct REST Cloud Save SUCCESS!");
+      setCloudStatus(true, `☁️ 실시간 공유 연결됨`);
+      showToast(`☁️ 전체 수강생 공유 서버에 등록되었습니다!`, 'success');
+      syncCloudDataViaRest();
+    } else {
+      const errText = await res.text();
+      console.error("☁️ REST Cloud Save ERROR Response:", errText);
+      showToast(`⚠️ 클라우드 저장 응답 확인: 파이어베이스 Rules 권한을 확인해주세요.`, 'warning');
+    }
+  } catch (err) {
+    console.error("☁️ REST Cloud Exception:", err);
   }
 }
 
@@ -313,7 +406,7 @@ function formatUrl(url) {
 }
 
 /**
- * Form Submit Handler
+ * Form Submit Handler (Instant UI + Dual Cloud Push: REST + SDK)
  */
 function handleFormSubmit(e) {
   if (e && e.preventDefault) e.preventDefault();
@@ -358,17 +451,16 @@ function handleFormSubmit(e) {
   renderApp();
   showToast(`🎉 ${studentName}님의 홈페이지가 등록되었습니다!`, 'success');
 
-  // 2. Broadcast to Firebase Cloud Firestore
+  // 2. Broadcast via Direct REST Cloud API
+  postSiteToCloudRest(newSite);
+
+  // 3. Broadcast via Firebase SDK
   if (isFirebaseEnabled && db) {
     addDoc(collection(db, "sites"), {
       ...newSite,
       createdAt: Date.now()
-    }).then(docRef => {
-      console.log("☁️ Firestore Cloud save SUCCESS, Document ID:", docRef.id);
-      showToast(`☁️ 수강생 전원 공유 서버에 저장되었습니다!`, 'success');
     }).catch(err => {
-      console.error("⚠️ Firestore Cloud save ERROR:", err);
-      showToast(`⚠️ 파이어베이스 서버 저장 실패 (${err.code || err.message}).`, 'warning');
+      console.warn("SDK Save notice:", err.message);
     });
   }
 
@@ -400,6 +492,7 @@ function handleDelete(id) {
   if (isFirebaseEnabled && db && !id.startsWith('mock-')) {
     deleteDoc(doc(db, "sites", id)).then(() => {
       console.log("☁️ Firestore document deleted successfully:", id);
+      syncCloudDataViaRest();
     }).catch(err => {
       console.warn("Firestore delete error:", err);
     });
