@@ -15,7 +15,7 @@ import {
   increment 
 } from './firebase-config.js';
 
-// Local Storage Key
+// Local Storage Keys
 const LOCAL_STORAGE_KEY = 'STUDENT_HUB_SITES_2026';
 const LIKED_SITES_KEY = 'STUDENT_HUB_LIKED_IDS';
 
@@ -135,7 +135,6 @@ function initData() {
           snapshot.forEach((doc) => {
             cloudSites.push({ id: doc.id, ...doc.data() });
           });
-          // Merge cloud sites with local fallback
           sitesList = cloudSites;
           saveToLocalStorage();
           renderApp();
@@ -164,83 +163,109 @@ function saveToLocalStorage() {
  */
 function bindEvents() {
   // Modal Open / Close
-  openRegisterModalBtn.addEventListener('click', openModal);
-  closeModalBtn.addEventListener('click', closeModal);
-  cancelRegisterBtn.addEventListener('click', closeModal);
-  emptyStateBtn.addEventListener('click', openModal);
+  if (openRegisterModalBtn) openRegisterModalBtn.addEventListener('click', openModal);
+  if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
+  if (cancelRegisterBtn) cancelRegisterBtn.addEventListener('click', closeModal);
+  if (emptyStateBtn) emptyStateBtn.addEventListener('click', openModal);
 
   // Close modal on backdrop click
-  registerModal.addEventListener('click', (e) => {
-    if (e.target === registerModal) closeModal();
-  });
+  if (registerModal) {
+    registerModal.addEventListener('click', (e) => {
+      if (e.target === registerModal) closeModal();
+    });
+  }
 
   // Avatar Picker
-  avatarPicker.querySelectorAll('.avatar-option').forEach(btn => {
-    btn.addEventListener('click', () => {
-      avatarPicker.querySelectorAll('.avatar-option').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      selectedAvatarInput.value = btn.dataset.avatar;
+  if (avatarPicker) {
+    avatarPicker.querySelectorAll('.avatar-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        avatarPicker.querySelectorAll('.avatar-option').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedAvatarInput.value = btn.dataset.avatar;
+      });
     });
-  });
+  }
 
   // Register Form Submit
-  registerForm.addEventListener('submit', handleFormSubmit);
+  if (registerForm) {
+    registerForm.addEventListener('submit', handleFormSubmit);
+  }
 
   // Search Input
-  searchInput.addEventListener('input', (e) => {
-    searchQuery = e.target.value.trim().toLowerCase();
-    clearSearchBtn.style.display = searchQuery ? 'block' : 'none';
-    renderApp();
-  });
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value.trim().toLowerCase();
+      if (clearSearchBtn) clearSearchBtn.style.display = searchQuery ? 'block' : 'none';
+      renderApp();
+    });
+  }
 
-  clearSearchBtn.addEventListener('click', () => {
-    searchInput.value = '';
-    searchQuery = '';
-    clearSearchBtn.style.display = 'none';
-    renderApp();
-  });
+  if (clearSearchBtn) {
+    clearSearchBtn.addEventListener('click', () => {
+      if (searchInput) searchInput.value = '';
+      searchQuery = '';
+      clearSearchBtn.style.display = 'none';
+      renderApp();
+    });
+  }
 
   // Category Filters
-  categoryFilters.addEventListener('click', (e) => {
-    const chip = e.target.closest('.filter-chip');
-    if (!chip) return;
+  if (categoryFilters) {
+    categoryFilters.addEventListener('click', (e) => {
+      const chip = e.target.closest('.filter-chip');
+      if (!chip) return;
 
-    categoryFilters.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-    chip.classList.add('active');
-    currentCategory = chip.dataset.category;
+      categoryFilters.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentCategory = chip.dataset.category;
 
-    currentCategoryTitle.textContent = currentCategory === 'all' ? '전체 홈페이지 목록' : `${currentCategory} 목록`;
-    renderApp();
-  });
+      if (currentCategoryTitle) {
+        currentCategoryTitle.textContent = currentCategory === 'all' ? '전체 홈페이지 목록' : `${currentCategory} 목록`;
+      }
+      renderApp();
+    });
+  }
 
   // Sort Selection
-  sortSelect.addEventListener('change', (e) => {
-    currentSort = e.target.value;
-    renderApp();
-  });
+  if (sortSelect) {
+    sortSelect.addEventListener('change', (e) => {
+      currentSort = e.target.value;
+      renderApp();
+    });
+  }
 }
 
 /**
  * Open Register Modal
  */
 function openModal() {
-  registerModal.style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-  document.getElementById('studentName').focus();
+  if (registerModal) {
+    registerModal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    const nameInput = document.getElementById('studentName');
+    if (nameInput) nameInput.focus();
+  }
 }
 
 /**
  * Close Register Modal
  */
 function closeModal() {
-  registerModal.style.display = 'none';
-  document.body.style.overflow = 'auto';
-  registerForm.reset();
+  if (registerModal) {
+    registerModal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+  }
+  if (registerForm) {
+    registerForm.reset();
+  }
   
   // Reset avatar picker
-  avatarPicker.querySelectorAll('.avatar-option').forEach(b => b.classList.remove('active'));
-  avatarPicker.querySelector('.avatar-option[data-avatar="👨‍💻"]').classList.add('active');
-  selectedAvatarInput.value = '👨‍💻';
+  if (avatarPicker) {
+    avatarPicker.querySelectorAll('.avatar-option').forEach(b => b.classList.remove('active'));
+    const defaultAvatar = avatarPicker.querySelector('.avatar-option[data-avatar="👨‍💻"]');
+    if (defaultAvatar) defaultAvatar.classList.add('active');
+    if (selectedAvatarInput) selectedAvatarInput.value = '👨‍💻';
+  }
 }
 
 /**
@@ -255,17 +280,23 @@ function formatUrl(url) {
 }
 
 /**
- * Form Submit Handler
+ * Form Submit Handler (Instant Response)
  */
-async function handleFormSubmit(e) {
+function handleFormSubmit(e) {
   e.preventDefault();
 
-  const studentName = document.getElementById('studentName').value.trim();
-  const siteTitle = document.getElementById('siteTitle').value.trim();
-  const rawUrl = document.getElementById('siteUrl').value.trim();
-  const siteCategory = document.getElementById('siteCategory').value;
-  const avatar = selectedAvatarInput.value || '👨‍💻';
-  const siteDescription = document.getElementById('siteDescription').value.trim() || '소개글이 작성되지 않았습니다.';
+  const studentNameInput = document.getElementById('studentName');
+  const siteTitleInput = document.getElementById('siteTitle');
+  const siteUrlInput = document.getElementById('siteUrl');
+  const siteCategoryInput = document.getElementById('siteCategory');
+  const siteDescriptionInput = document.getElementById('siteDescription');
+
+  const studentName = studentNameInput ? studentNameInput.value.trim() : '';
+  const siteTitle = siteTitleInput ? siteTitleInput.value.trim() : '';
+  const rawUrl = siteUrlInput ? siteUrlInput.value.trim() : '';
+  const siteCategory = siteCategoryInput ? siteCategoryInput.value : '기타';
+  const avatar = (selectedAvatarInput && selectedAvatarInput.value) ? selectedAvatarInput.value : '👨‍💻';
+  const siteDescription = (siteDescriptionInput && siteDescriptionInput.value.trim()) ? siteDescriptionInput.value.trim() : '소개글이 작성되지 않았습니다.';
 
   if (!studentName || !siteTitle || !rawUrl) {
     showToast('필수 항목을 모두 입력해 주세요.', 'warning');
@@ -286,33 +317,26 @@ async function handleFormSubmit(e) {
     createdAt: Date.now()
   };
 
-  // Try adding to Firebase Firestore if enabled
-  if (isFirebaseEnabled && db) {
-    try {
-      await addDoc(collection(db, "sites"), {
-        ...newSite,
-        createdAt: Date.now()
-      });
-      console.log("🔥 Firestore에 신규 홈페이지 등록 성공");
-    } catch (err) {
-      console.warn("Firestore 저장 실패, 로컬 저장소에 저장합니다:", err);
-      sitesList.unshift(newSite);
-      saveToLocalStorage();
-    }
-  } else {
-    sitesList.unshift(newSite);
-    saveToLocalStorage();
-  }
-
+  // 1. Immediately update LocalState & UI (Instant reaction, no hanging)
+  sitesList.unshift(newSite);
+  saveToLocalStorage();
   closeModal();
   renderApp();
   showToast(`🎉 ${studentName}님의 홈페이지가 등록되었습니다!`, 'success');
+
+  // 2. Async background Cloud Sync if enabled
+  if (isFirebaseEnabled && db) {
+    addDoc(collection(db, "sites"), {
+      ...newSite,
+      createdAt: Date.now()
+    }).catch(err => console.warn("Background Firebase sync skipped:", err));
+  }
 }
 
 /**
  * Handle Like / Cheer Button
  */
-async function handleLike(id) {
+function handleLike(id) {
   const isLiked = likedSiteIds.includes(id);
   const targetSite = sitesList.find(s => s.id === id);
 
@@ -329,16 +353,12 @@ async function handleLike(id) {
   localStorage.setItem(LIKED_SITES_KEY, JSON.stringify(likedSiteIds));
   saveToLocalStorage();
 
-  // Firestore update if available
+  // Async Firestore update if enabled
   if (isFirebaseEnabled && db && !id.startsWith('mock-')) {
-    try {
-      const siteRef = doc(db, "sites", id);
-      await updateDoc(siteRef, {
-        likes: increment(isLiked ? -1 : 1)
-      });
-    } catch (e) {
-      console.warn("Firestore like update error:", e);
-    }
+    const siteRef = doc(db, "sites", id);
+    updateDoc(siteRef, {
+      likes: increment(isLiked ? -1 : 1)
+    }).catch(e => console.warn("Firestore like update error:", e));
   }
 
   renderApp();
@@ -351,11 +371,29 @@ async function handleLike(id) {
  * Copy Site Link to Clipboard
  */
 function copyLink(url) {
-  navigator.clipboard.writeText(url).then(() => {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('📋 링크가 클립보드에 복사되었습니다!', 'info');
+    }).catch(() => {
+      fallbackCopy(url);
+    });
+  } else {
+    fallbackCopy(url);
+  }
+}
+
+function fallbackCopy(url) {
+  const textArea = document.createElement("textarea");
+  textArea.value = url;
+  document.body.appendChild(textArea);
+  textArea.select();
+  try {
+    document.execCommand('copy');
     showToast('📋 링크가 클립보드에 복사되었습니다!', 'info');
-  }).catch(() => {
+  } catch (err) {
     showToast('링크 복사에 실패했습니다.', 'warning');
-  });
+  }
+  document.body.removeChild(textArea);
 }
 
 /**
@@ -388,10 +426,10 @@ function getFilteredAndSortedSites() {
   // Search filter
   if (searchQuery) {
     list = list.filter(item => 
-      item.studentName.toLowerCase().includes(searchQuery) ||
-      item.siteTitle.toLowerCase().includes(searchQuery) ||
-      item.siteDescription.toLowerCase().includes(searchQuery) ||
-      item.siteCategory.toLowerCase().includes(searchQuery)
+      (item.studentName && item.studentName.toLowerCase().includes(searchQuery)) ||
+      (item.siteTitle && item.siteTitle.toLowerCase().includes(searchQuery)) ||
+      (item.siteDescription && item.siteDescription.toLowerCase().includes(searchQuery)) ||
+      (item.siteCategory && item.siteCategory.toLowerCase().includes(searchQuery))
     );
   }
 
@@ -399,9 +437,9 @@ function getFilteredAndSortedSites() {
   if (currentSort === 'latest') {
     list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   } else if (currentSort === 'likes') {
-    list.sort((a, b) => b.likes - a.likes);
+    list.sort((a, b) => (b.likes || 0) - (a.likes || 0));
   } else if (currentSort === 'name') {
-    list.sort((a, b) => a.studentName.localeCompare(b.studentName, 'ko'));
+    list.sort((a, b) => (a.studentName || '').localeCompare(b.studentName || '', 'ko'));
   }
 
   return list;
@@ -412,12 +450,12 @@ function getFilteredAndSortedSites() {
  */
 function updateStats() {
   const totalSites = sitesList.length;
-  const uniqueStudents = new Set(sitesList.map(s => s.studentName.trim())).size;
+  const uniqueStudents = new Set(sitesList.map(s => (s.studentName || '').trim())).size;
   const totalLikes = sitesList.reduce((acc, s) => acc + (s.likes || 0), 0);
 
-  totalSitesCount.textContent = totalSites;
-  totalStudentsCount.textContent = uniqueStudents;
-  totalLikesCount.textContent = totalLikes;
+  if (totalSitesCount) totalSitesCount.textContent = totalSites;
+  if (totalStudentsCount) totalStudentsCount.textContent = uniqueStudents;
+  if (totalLikesCount) totalLikesCount.textContent = totalLikes;
 }
 
 /**
@@ -426,6 +464,8 @@ function updateStats() {
 function renderApp() {
   updateStats();
   const displayList = getFilteredAndSortedSites();
+
+  if (!cardsGrid || !emptyState) return;
 
   if (displayList.length === 0) {
     cardsGrid.style.display = 'none';
@@ -438,14 +478,14 @@ function renderApp() {
 
   cardsGrid.innerHTML = displayList.map(site => {
     const isLiked = likedSiteIds.includes(site.id);
-    const displayUrl = site.siteUrl.replace(/^https?:\/\//i, '');
+    const displayUrl = (site.siteUrl || '').replace(/^https?:\/\//i, '');
     const timeAgo = getTimeAgo(site.createdAt);
 
     return `
       <article class="card">
         <div class="card-header">
           <div class="student-info">
-            <div class="avatar-bubble" title="${site.studentName} 수강생">${site.avatar || '👨‍💻'}</div>
+            <div class="avatar-bubble" title="${escapeHtml(site.studentName)} 수강생">${site.avatar || '👨‍💻'}</div>
             <div class="student-meta">
               <div class="student-name">${escapeHtml(site.studentName)}</div>
               <div class="time-ago">${timeAgo}</div>
@@ -463,7 +503,7 @@ function renderApp() {
         </div>
 
         <div class="card-footer">
-          <!-- CRITICAL: Open page in new tab target="_blank" -->
+          <!-- CRITICAL: Open in new tab target="_blank" -->
           <a href="${escapeHtml(site.siteUrl)}" target="_blank" rel="noopener noreferrer" class="visit-btn">
             <span>홈페이지 방문하기</span>
             <i class="fa-solid fa-arrow-up-right-from-square"></i>
@@ -474,7 +514,7 @@ function renderApp() {
                     data-id="${site.id}" 
                     title="응원하기(좋아요)">
               <i class="fa-${isLiked ? 'solid' : 'regular'} fa-heart"></i>
-              <span class="like-count">${site.likes}</span>
+              <span class="like-count">${site.likes || 0}</span>
             </button>
             <button class="action-btn share-btn" 
                     data-url="${escapeHtml(site.siteUrl)}" 
@@ -489,7 +529,7 @@ function renderApp() {
 
   // Attach card action listeners
   cardsGrid.querySelectorAll('.like-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', () => {
       const id = btn.dataset.id;
       handleLike(id);
     });
@@ -507,6 +547,8 @@ function renderApp() {
  */
 let toastTimeout = null;
 function showToast(msg, type = 'success') {
+  if (!toast || !toastMsg || !toastIcon) return;
+
   toastMsg.textContent = msg;
   
   if (type === 'like') {

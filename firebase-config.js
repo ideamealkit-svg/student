@@ -9,32 +9,33 @@ import {
   orderBy, 
   doc, 
   updateDoc, 
-  increment,
+  increment, 
   serverTimestamp 
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-// Firebase 프로젝트 설정 (수강생 실시간 공유용)
-// 필요시 실제 Firebase 프로젝트 설정으로 변경 가능합니다.
+// Firebase 설정 (실제 Firebase 프로젝트 정보 입력 시 실시간 동기화 활성화)
 const firebaseConfig = {
-  apiKey: "AIzaSyDemoConfigKeyForStudentHub2026",
-  authDomain: "student-web-hub.firebaseapp.com",
-  projectId: "student-web-hub",
-  storageBucket: "student-web-hub.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:demo123456789"
+  apiKey: "", // 필요 시 실제 Firebase API 키 입력
+  authDomain: "",
+  projectId: ""
 };
 
 let db = null;
 let isFirebaseEnabled = false;
 
-try {
-  const app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
-  isFirebaseEnabled = true;
-  console.log("🔥 Firebase Cloud Firestore가 정상적으로 연결되었습니다.");
-} catch (e) {
-  console.warn("⚠️ Firebase 기본 모드 (LocalStorage 및 메모리 동기화 모드로 동작합니다):", e.message);
-  isFirebaseEnabled = false;
+// 유효한 프로젝트 설정이 입력된 경우에만 Firebase 활성화
+if (firebaseConfig.projectId && firebaseConfig.apiKey) {
+  try {
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    isFirebaseEnabled = true;
+    console.log("🔥 Firebase Cloud Firestore가 연결되었습니다.");
+  } catch (e) {
+    console.warn("⚠️ Firebase 초기화 실패:", e.message);
+    isFirebaseEnabled = false;
+  }
+} else {
+  console.log("ℹ️ 로컬/브라우저 저장소 모드로 작동합니다.");
 }
 
 export { 
