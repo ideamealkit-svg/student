@@ -1,5 +1,5 @@
 /**
- * Student Web Hub - Main Application Logic (Fully Authenticated REST Cloud Sync)
+ * Student Web Hub - Main Application Logic (Real Student Cloud Data Only - Zero Fake Mock Data)
  */
 
 import { 
@@ -14,8 +14,8 @@ import {
   increment 
 } from './firebase-config.js';
 
-// Local Storage Keys
-const LOCAL_STORAGE_KEY = 'STUDENT_HUB_SITES_2026';
+// Clean Local Storage Keys (Purges any legacy mock caches)
+const LOCAL_STORAGE_KEY = 'STUDENT_HUB_SITES_REAL_V2';
 const LIKED_SITES_KEY = 'STUDENT_HUB_LIKED_IDS';
 const DELETED_SITES_KEY = 'STUDENT_HUB_DELETED_IDS';
 
@@ -23,53 +23,8 @@ const DELETED_SITES_KEY = 'STUDENT_HUB_DELETED_IDS';
 const API_KEY = 'AIzaSyBjiUGAqH1iup9LuI3D1q7ZVz4O4Mgw55U';
 const FIRESTORE_REST_BASE = `https://firestore.googleapis.com/v1/projects/student-hub-bd017/databases/(default)/documents/sites?key=${API_KEY}`;
 
-// Initial Mock Data
-const INITIAL_MOCK_DATA = [
-  {
-    id: 'mock-1',
-    studentName: '김민수',
-    siteTitle: '민수의 프론트엔드 웹 포트폴리오',
-    siteUrl: 'https://minsu-kim-dev.github.io',
-    siteCategory: '포트폴리오',
-    avatar: '👨‍💻',
-    siteDescription: 'HTML, CSS, JavaScript로 반응형 레이아웃과 모던 인터랙션을 직접 구현한 첫 웹 포트폴리오입니다!',
-    likes: 24,
-    createdAt: Date.now() - 86400000 * 3
-  },
-  {
-    id: 'mock-2',
-    studentName: '이지은',
-    siteTitle: '지은이의 코딩 & 일상 테크 블로그',
-    siteUrl: 'https://jieun-tech-blog.vercel.app',
-    siteCategory: '개인블로그',
-    avatar: '👩‍💻',
-    siteDescription: '매일매일 실습한 코드 노하우와 개발 에러 해결 과정을 기록하는 개인 기술 블로그입니다.',
-    likes: 31,
-    createdAt: Date.now() - 86400000 * 2
-  },
-  {
-    id: 'mock-3',
-    studentName: '박서준',
-    siteTitle: '수강생 전용 맛집 추천 웹서비스 (FoodHub)',
-    siteUrl: 'https://seojun-foodhub.netlify.app',
-    siteCategory: '쇼핑몰/서비스',
-    avatar: '🚀',
-    siteDescription: '수강생들이 강의실 주변 가성비 맛집 정보와 리뷰를 실시간으로 올리고 공유하는 커뮤니티입니다.',
-    likes: 45,
-    createdAt: Date.now() - 86400000 * 1
-  },
-  {
-    id: 'mock-4',
-    studentName: '최유진',
-    siteTitle: '팀 픽셀아트 갤러리 - Interactive Canvas',
-    siteUrl: 'https://pixel-team-project.github.io',
-    siteCategory: '팀프로젝트',
-    avatar: '🎨',
-    siteDescription: '수강생 3명이 함께 협업하여 캔버스 API로 구현한 인터랙티브 픽셀 아트 전시 공간입니다.',
-    likes: 28,
-    createdAt: Date.now() - 3600000 * 5
-  }
-];
+// NO FAKE MOCK DATA - Real Submissions Only
+const INITIAL_MOCK_DATA = [];
 
 // App State
 let sitesList = [];
@@ -99,12 +54,15 @@ if (document.readyState === 'loading') {
 }
 
 function initApp() {
+  // Clear any legacy mock data from localStorage
+  localStorage.removeItem('STUDENT_HUB_SITES_2026');
+  
   getDomElements();
   initData();
   bindEvents();
 
-  // Periodically fetch REST Cloud Updates every 5 seconds
-  setInterval(syncCloudDataViaRest, 5000);
+  // Periodically fetch REST Cloud Updates every 4 seconds
+  setInterval(syncCloudDataViaRest, 4000);
 }
 
 function getDomElements() {
@@ -158,7 +116,7 @@ function sanitizeSites(list) {
 }
 
 /**
- * Initialize Data (LocalStorage + Authenticated Cloud Sync)
+ * Initialize Data (LocalStorage + Real Cloud Firestore Only)
  */
 function initData() {
   const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -166,10 +124,10 @@ function initData() {
     try {
       sitesList = sanitizeSites(JSON.parse(localData));
     } catch (e) {
-      sitesList = sanitizeSites(INITIAL_MOCK_DATA);
+      sitesList = [];
     }
   } else {
-    sitesList = sanitizeSites(INITIAL_MOCK_DATA);
+    sitesList = [];
     saveToLocalStorage();
   }
 
@@ -202,15 +160,12 @@ function initData() {
 }
 
 /**
- * Merge Cloud Data into Sites List
+ * Merge Cloud Data into Sites List (Pure Cloud Data)
  */
 function updateSitesWithCloudData(cloudSites) {
-  if (!cloudSites || cloudSites.length === 0) return;
+  if (!cloudSites) return;
 
-  const cloudIds = new Set(cloudSites.map(c => c.id));
-  const mockTail = INITIAL_MOCK_DATA.filter(m => !cloudIds.has(m.id));
-  
-  sitesList = sanitizeSites([...cloudSites, ...mockTail]);
+  sitesList = sanitizeSites(cloudSites);
   sitesList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
   saveToLocalStorage();
@@ -231,7 +186,12 @@ async function syncCloudDataViaRest() {
     }
     
     const data = await res.json();
-    if (!data.documents) return;
+    if (!data.documents) {
+      if (sitesList.length === 0) {
+        setCloudStatus(true, `☁️ 실시간 클라우드 연결됨 (0개 등록됨)`);
+      }
+      return;
+    }
 
     const restSites = data.documents.map(docItem => {
       const fields = docItem.fields || {};
@@ -251,7 +211,7 @@ async function syncCloudDataViaRest() {
       };
     });
 
-    setCloudStatus(true, `☁️ 실시간 클라우드 연결됨 (${restSites.length}개 전체 공유)`);
+    setCloudStatus(true, `☁️ 실시간 클라우드 연결됨 (${restSites.length}개 공유 중)`);
     updateSitesWithCloudData(restSites);
   } catch (e) {
     console.warn("REST Sync notice:", e);
@@ -285,12 +245,11 @@ async function postSiteToCloudRest(newSite) {
     if (res.ok) {
       console.log("☁️ Authenticated REST Cloud Save SUCCESS!");
       setCloudStatus(true, `☁️ 실시간 공유 연결됨`);
-      showToast(`☁️ 수강생 전원 공유 서버에 저장되었습니다!`, 'success');
+      showToast(`☁️ 수강생 전원 공유 서버에 등록되었습니다!`, 'success');
       syncCloudDataViaRest();
     } else {
       const errText = await res.text();
       console.error("☁️ REST Cloud Save ERROR Response:", errText);
-      showToast(`⚠️ 파이어베이스 Rules 권한(allow read, write: if true;) 확인이 필요합니다.`, 'warning');
     }
   } catch (err) {
     console.error("☁️ REST Cloud Exception:", err);
@@ -301,7 +260,7 @@ async function postSiteToCloudRest(newSite) {
  * Direct Authenticated REST API DELETE
  */
 async function deleteSiteFromCloudRest(id) {
-  if (!id || id.startsWith('mock-')) return;
+  if (!id) return;
   try {
     const deleteUrl = `https://firestore.googleapis.com/v1/projects/student-hub-bd017/databases/(default)/documents/sites/${id}?key=${API_KEY}`;
     await fetch(deleteUrl, { method: 'DELETE' });
@@ -507,7 +466,7 @@ function handleDelete(id) {
   deleteSiteFromCloudRest(id);
 
   // Delete from Cloud Firestore SDK if enabled
-  if (isFirebaseEnabled && db && !id.startsWith('mock-')) {
+  if (isFirebaseEnabled && db) {
     deleteDoc(doc(db, "sites", id)).catch(err => {
       console.warn("Firestore SDK delete notice:", err);
     });
@@ -532,7 +491,7 @@ function handleLike(id) {
   saveToLocalStorage();
 
   // Async Firestore update
-  if (isFirebaseEnabled && db && !id.startsWith('mock-')) {
+  if (isFirebaseEnabled && db) {
     const siteRef = doc(db, "sites", id);
     updateDoc(siteRef, {
       likes: increment(isLiked ? -1 : 1)
