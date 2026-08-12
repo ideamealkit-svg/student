@@ -1,5 +1,5 @@
 /**
- * Student Web Hub - Main Application Logic (Real-time Cloud Sync + Status Indicator)
+ * Student Web Hub - Main Application Logic (Permanent Delete & Real-time Cloud Sync)
  */
 
 import { 
@@ -17,8 +17,9 @@ import {
 // Local Storage Keys
 const LOCAL_STORAGE_KEY = 'STUDENT_HUB_SITES_2026';
 const LIKED_SITES_KEY = 'STUDENT_HUB_LIKED_IDS';
+const DELETED_SITES_KEY = 'STUDENT_HUB_DELETED_IDS';
 
-// Initial Mock Data
+// Initial Mock Data (SEED ONCE ONLY)
 const INITIAL_MOCK_DATA = [
   {
     id: 'mock-1',
@@ -72,6 +73,7 @@ let currentCategory = 'all';
 let searchQuery = '';
 let currentSort = 'latest';
 let likedSiteIds = JSON.parse(localStorage.getItem(LIKED_SITES_KEY) || '[]');
+let deletedSiteIds = JSON.parse(localStorage.getItem(DELETED_SITES_KEY) || '[]');
 
 // DOM Elements
 let cardsGrid, emptyState, searchInput, clearSearchBtn, categoryFilters, sortSelect, currentCategoryTitle;
@@ -141,25 +143,33 @@ function setCloudStatus(connected, message) {
 }
 
 /**
- * Initialize Data (LocalStorage + Realtime Cloud Sync)
+ * Filter out any deleted IDs permanently
+ */
+function sanitizeSites(list) {
+  const deletedSet = new Set(deletedSiteIds);
+  return list.filter(item => !deletedSet.has(item.id));
+}
+
+/**
+ * Initialize Data
  */
 function initData() {
   const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
   if (localData) {
     try {
-      sitesList = JSON.parse(localData);
+      sitesList = sanitizeSites(JSON.parse(localData));
     } catch (e) {
-      sitesList = INITIAL_MOCK_DATA;
+      sitesList = sanitizeSites(INITIAL_MOCK_DATA);
     }
   } else {
-    sitesList = INITIAL_MOCK_DATA;
+    sitesList = sanitizeSites(INITIAL_MOCK_DATA);
     saveToLocalStorage();
   }
 
   // Render local state immediately
   renderApp();
 
-  // Firebase Real-time Cloud Sync across all students & devices
+  // Firebase Real-time Cloud Sync
   if (isFirebaseEnabled && db) {
     try {
       onSnapshot(collection(db, "sites"), (snapshot) => {
@@ -170,14 +180,12 @@ function initData() {
           cloudSites.push({ id: docSnap.id, ...docSnap.data() });
         });
 
-        // Merge cloud items with initial mock data if cloud is empty
         if (cloudSites.length > 0) {
           const cloudIds = new Set(cloudSites.map(c => c.id));
           const mockTail = INITIAL_MOCK_DATA.filter(m => !cloudIds.has(m.id));
-          
-          sitesList = [...cloudSites, ...mockTail];
+          sitesList = sanitizeSites([...cloudSites, ...mockTail]);
         } else {
-          sitesList = INITIAL_MOCK_DATA;
+          sitesList = sanitizeSites(INITIAL_MOCK_DATA);
         }
 
         sitesList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -186,9 +194,6 @@ function initData() {
       }, (err) => {
         console.error("⚠️ Firestore Cloud sync error:", err);
         setCloudStatus(false, `⚠️ 파이어베이스 서버 연결 대기중`);
-        if (err.message && err.message.includes('permission-denied')) {
-          showToast(`⚠️ 파이어베이스 Rules 규칙 게시가 완료되면 실시간 공유가 시작됩니다.`, 'warning');
-        }
       });
     } catch (e) {
       setCloudStatus(false, `⚠️ 파이어베이스 설정 오류`);
@@ -200,6 +205,7 @@ function initData() {
 
 function saveToLocalStorage() {
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sitesList));
+  localStorage.setItem(DELETED_SITES_KEY, JSON.stringify(deletedSiteIds));
 }
 
 function bindEvents() {
@@ -307,7 +313,7 @@ function formatUrl(url) {
 }
 
 /**
- * Form Submit Handler (Instant UI Update + Firestore Cloud Broadcast)
+ * Form Submit Handler
  */
 function handleFormSubmit(e) {
   if (e && e.preventDefault) e.preventDefault();
@@ -344,7 +350,7 @@ function handleFormSubmit(e) {
     createdAt: Date.now()
   };
 
-  // 1. Immediately update LocalState & UI (Instant response)
+  // 1. Immediately update LocalState & UI
   sitesList.unshift(newSite);
   saveToLocalStorage();
   
@@ -352,7 +358,7 @@ function handleFormSubmit(e) {
   renderApp();
   showToast(`🎉 ${studentName}님의 홈페이지가 등록되었습니다!`, 'success');
 
-  // 2. Broadcast to Firebase Cloud Firestore for all students to see live
+  // 2. Broadcast to Firebase Cloud Firestore
   if (isFirebaseEnabled && db) {
     addDoc(collection(db, "sites"), {
       ...newSite,
@@ -370,7 +376,7 @@ function handleFormSubmit(e) {
 }
 
 /**
- * Handle Delete Site Card
+ * Handle Permanent Delete Site Card
  */
 function handleDelete(id) {
   const targetSite = sitesList.find(s => s.id === id);
@@ -379,13 +385,18 @@ function handleDelete(id) {
   const confirmMsg = `'${targetSite.studentName}' 수강생의 '${targetSite.siteTitle}' 홈페이지를 정말 삭제하시겠습니까?`;
   if (!confirm(confirmMsg)) return;
 
-  // 1. Update local state & LocalStorage
+  // Track deleted ID permanently
+  if (!deletedSiteIds.includes(id)) {
+    deletedSiteIds.push(id);
+  }
+
+  // Update local state & LocalStorage
   sitesList = sitesList.filter(s => s.id !== id);
   saveToLocalStorage();
   renderApp();
-  showToast(`🗑️ ${targetSite.studentName}님의 홈페이지가 삭제되었습니다.`, 'info');
+  showToast(`🗑️ ${targetSite.studentName}님의 홈페이지가 완전 삭제되었습니다.`, 'info');
 
-  // 2. Delete from Cloud Firestore if enabled
+  // Delete from Cloud Firestore if enabled
   if (isFirebaseEnabled && db && !id.startsWith('mock-')) {
     deleteDoc(doc(db, "sites", id)).then(() => {
       console.log("☁️ Firestore document deleted successfully:", id);
