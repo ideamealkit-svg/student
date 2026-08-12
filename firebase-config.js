@@ -1,6 +1,5 @@
 // Firebase SDK ESM Imports via CDN
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { 
   getFirestore, 
   collection, 
@@ -8,12 +7,9 @@ import {
   setDoc, 
   addDoc, 
   onSnapshot, 
-  query, 
-  orderBy, 
   updateDoc, 
   deleteDoc,
-  increment, 
-  serverTimestamp 
+  increment
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
 // -------------------------------------------------------------
@@ -30,39 +26,27 @@ const firebaseConfig = {
 };
 
 let db = null;
-let auth = null;
 let isFirebaseEnabled = false;
 
 try {
   const app = initializeApp(firebaseConfig);
   db = getFirestore(app);
-  auth = getAuth(app);
-  
-  // 익명 자동 로그인 처리
-  signInAnonymously(auth).catch((err) => {
-    console.warn("⚠️ Firebase Auth notice:", err.message);
-  });
-
   isFirebaseEnabled = true;
-  console.log("🔥 Firebase Cloud Firestore 실시간 모듈이 활성화되었습니다!");
+  console.log("🔥 Firebase Firestore 연결 성공!");
 } catch (e) {
-  console.warn("⚠️ Firebase connection error:", e.message);
+  console.warn("⚠️ Firebase 연결 오류:", e.message);
   isFirebaseEnabled = false;
 }
 
 export { 
   db, 
-  auth,
   isFirebaseEnabled, 
   collection, 
   doc, 
   setDoc, 
   addDoc, 
   onSnapshot, 
-  query, 
-  orderBy, 
   updateDoc, 
   deleteDoc,
-  increment, 
-  serverTimestamp 
+  increment
 };
