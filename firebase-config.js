@@ -4,11 +4,12 @@ import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/1
 import { 
   getFirestore, 
   collection, 
+  doc, 
+  setDoc, 
   addDoc, 
   onSnapshot, 
   query, 
   orderBy, 
-  doc, 
   updateDoc, 
   deleteDoc,
   increment, 
@@ -37,17 +38,15 @@ try {
   db = getFirestore(app);
   auth = getAuth(app);
   
-  // 모든 기기/컴퓨터에서 권한 통과를 위해 익명 자동 인증 실행
-  signInAnonymously(auth).then((userCredential) => {
-    console.log("🔓 Firebase 익명 자동 인증 성공! UID:", userCredential.user.uid);
-  }).catch((err) => {
-    console.warn("⚠️ Firebase 인증 진행 안내:", err.message);
+  // 익명 자동 로그인 처리
+  signInAnonymously(auth).catch((err) => {
+    console.warn("⚠️ Firebase Auth notice:", err.message);
   });
 
   isFirebaseEnabled = true;
-  console.log("🔥 Firebase Cloud Firestore 실시간 공유가 연결되었습니다!");
+  console.log("🔥 Firebase Cloud Firestore 실시간 모듈이 활성화되었습니다!");
 } catch (e) {
-  console.warn("⚠️ Firebase 연결 오류:", e.message);
+  console.warn("⚠️ Firebase connection error:", e.message);
   isFirebaseEnabled = false;
 }
 
@@ -56,11 +55,12 @@ export {
   auth,
   isFirebaseEnabled, 
   collection, 
+  doc, 
+  setDoc, 
   addDoc, 
   onSnapshot, 
   query, 
   orderBy, 
-  doc, 
   updateDoc, 
   deleteDoc,
   increment, 
