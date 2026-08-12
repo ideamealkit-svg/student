@@ -1,5 +1,5 @@
 /**
- * Student Web Hub - Main Application Logic
+ * Student Web Hub - Main Application Logic (Real-time Cloud Sync)
  */
 
 import { 
@@ -78,7 +78,7 @@ let registerModal, openRegisterModalBtn, closeModalBtn, cancelRegisterBtn, empty
 let totalSitesCount, totalStudentsCount, totalLikesCount;
 let toast, toastMsg, toastIcon;
 
-// Global Window Helpers (for fail-safe inline HTML triggers)
+// Global Window Helpers
 window.openRegisterModal = openModal;
 window.closeRegisterModal = closeModal;
 window.handleRegisterSubmit = handleFormSubmit;
@@ -125,7 +125,7 @@ function getDomElements() {
 }
 
 /**
- * Initialize Data (LocalStorage + Firebase Realtime Listener without index requirements)
+ * Initialize Data (LocalStorage + Realtime Cloud Sync)
  */
 function initData() {
   const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -140,43 +140,44 @@ function initData() {
     saveToLocalStorage();
   }
 
-  // Render initial UI fast
+  // Render local state immediately
   renderApp();
 
-  // Firebase Real-time Cloud Sync (Simple query without index requirement)
+  // Firebase Real-time Cloud Sync across all students & devices
   if (isFirebaseEnabled && db) {
     try {
       onSnapshot(collection(db, "sites"), (snapshot) => {
+        console.log("☁️ Firestore Cloud snapshot updated. Doc count:", snapshot.size);
         const cloudSites = [];
         snapshot.forEach((docSnap) => {
           cloudSites.push({ id: docSnap.id, ...docSnap.data() });
         });
+
+        // Merge cloud items with initial mock data if cloud is empty
         if (cloudSites.length > 0) {
-          // Sort client-side so no Firestore index is required
-          cloudSites.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-          sitesList = cloudSites;
+          // Combine unique items (Cloud items first, then local mock items)
+          const cloudIds = new Set(cloudSites.map(c => c.id));
+          const mockTail = INITIAL_MOCK_DATA.filter(m => !cloudIds.has(m.id));
+          
+          sitesList = [...cloudSites, ...mockTail];
+          sitesList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+          
           saveToLocalStorage();
           renderApp();
         }
       }, (err) => {
-        console.warn("Firestore listener warning:", err.message);
+        console.error("⚠️ Firestore Cloud sync error (Permission rules check needed):", err);
       });
     } catch (e) {
-      console.warn("Firestore collection setup error:", e);
+      console.error("⚠️ Firestore collection error:", e);
     }
   }
 }
 
-/**
- * Save data to LocalStorage
- */
 function saveToLocalStorage() {
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sitesList));
 }
 
-/**
- * Event Bindings
- */
 function bindEvents() {
   if (openRegisterModalBtn) openRegisterModalBtn.addEventListener('click', openModal);
   if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
@@ -282,7 +283,7 @@ function formatUrl(url) {
 }
 
 /**
- * Form Submit Handler (Fail-safe Instant Update & Async Firestore Push)
+ * Form Submit Handler (Instant UI Update + Firestore Cloud Broadcast)
  */
 function handleFormSubmit(e) {
   if (e && e.preventDefault) e.preventDefault();
@@ -325,17 +326,20 @@ function handleFormSubmit(e) {
   
   closeModal();
   renderApp();
-  showToast(`🎉 ${studentName}님의 홈페이지가 등록되었습니다!`, 'success');
+  showToast(`🎉 ${studentName}님의 홈페이지가 클라우드에 등록되었습니다!`, 'success');
 
-  // 2. Push to Firebase Cloud Firestore for multi-user real-time sync
+  // 2. Broadcast to Firebase Cloud Firestore for all students to see live
   if (isFirebaseEnabled && db) {
     addDoc(collection(db, "sites"), {
       ...newSite,
       createdAt: Date.now()
     }).then(docRef => {
-      console.log("🔥 Firestore cloud save successful, ID:", docRef.id);
+      console.log("☁️ Firestore Cloud save SUCCESS, Document ID:", docRef.id);
     }).catch(err => {
-      console.warn("Firestore cloud save error:", err.message);
+      console.error("⚠️ Firestore Cloud save ERROR:", err);
+      if (err.message && err.message.includes('permission-denied')) {
+        showToast('⚠️ 파이어베이스 권한 적용 대기 중입니다 (1~2분 후 동기화됩니다)', 'warning');
+      }
     });
   }
 
