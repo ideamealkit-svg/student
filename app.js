@@ -122,7 +122,7 @@ function getDomElements() {
 }
 
 /**
- * Initialize Data
+ * Initialize Data (LocalStorage + Firebase Cloud Realtime Listener)
  */
 function initData() {
   const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -136,7 +136,31 @@ function initData() {
     sitesList = INITIAL_MOCK_DATA;
     saveToLocalStorage();
   }
+
+  // Render immediately for fast load
   renderApp();
+
+  // Firebase Real-time Cloud Sync
+  if (isFirebaseEnabled && db) {
+    try {
+      const q = query(collection(db, "sites"), orderBy("createdAt", "desc"));
+      onSnapshot(q, (snapshot) => {
+        const cloudSites = [];
+        snapshot.forEach((docSnap) => {
+          cloudSites.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        if (cloudSites.length > 0) {
+          sitesList = cloudSites;
+          saveToLocalStorage();
+          renderApp();
+        }
+      }, (err) => {
+        console.warn("Firestore listener error (ensure Rules allow read/write):", err.message);
+      });
+    } catch (e) {
+      console.warn("Firestore query setup error:", e);
+    }
+  }
 }
 
 /**
@@ -252,7 +276,7 @@ function formatUrl(url) {
 }
 
 /**
- * Form Submit Handler (100% Instant & Robust)
+ * Form Submit Handler (Instant Response + Cloud Firestore Push)
  */
 function handleFormSubmit(e) {
   if (e) e.preventDefault();
@@ -289,14 +313,25 @@ function handleFormSubmit(e) {
     createdAt: Date.now()
   };
 
-  // Update List & Storage
+  // 1. Immediately update LocalState & UI (Instant response)
   sitesList.unshift(newSite);
   saveToLocalStorage();
   
-  // Close Modal & Re-render
   closeModal();
   renderApp();
   showToast(`🎉 ${studentName}님의 홈페이지가 등록되었습니다!`, 'success');
+
+  // 2. Push to Firebase Cloud Firestore for multi-user real-time sync
+  if (isFirebaseEnabled && db) {
+    addDoc(collection(db, "sites"), {
+      ...newSite,
+      createdAt: Date.now()
+    }).then(docRef => {
+      console.log("🔥 Firestore cloud save successful, ID:", docRef.id);
+    }).catch(err => {
+      console.warn("Firestore cloud save error (ensure Firestore Rules allow read/write):", err.message);
+    });
+  }
 }
 
 function handleLike(id) {
@@ -315,6 +350,14 @@ function handleLike(id) {
 
   localStorage.setItem(LIKED_SITES_KEY, JSON.stringify(likedSiteIds));
   saveToLocalStorage();
+
+  // Async Firestore update
+  if (isFirebaseEnabled && db && !id.startsWith('mock-')) {
+    const siteRef = doc(db, "sites", id);
+    updateDoc(siteRef, {
+      likes: increment(isLiked ? -1 : 1)
+    }).catch(e => console.warn("Firestore like update error:", e));
+  }
 
   renderApp();
   if (!isLiked) {
