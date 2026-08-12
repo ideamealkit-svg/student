@@ -34,6 +34,7 @@ let registerModal, openRegisterModalBtn, closeModalBtn, cancelRegisterBtn, empty
 let totalSitesCount, totalStudentsCount, totalLikesCount;
 let toast, toastMsg, toastIcon;
 let cloudStatus, cloudStatusText;
+let toastTimeout = null;
 
 // Global Window Helpers
 window.openRegisterModal = openModal;
