@@ -114,6 +114,8 @@ body {
   align-items: center;
   padding: 24px 0;
   border-bottom: 1px solid var(--border-light);
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .logo {
@@ -152,6 +154,56 @@ body {
   font-size: 13px;
   color: var(--text-muted);
   font-weight: 500;
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Cloud Status Badge */
+.cloud-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-light);
+  color: var(--text-muted);
+  transition: var(--transition-fast);
+}
+
+.cloud-status.connected {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+}
+
+.cloud-status.error {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+
+.cloud-status.connected .status-dot {
+  background: var(--accent-emerald);
+  box-shadow: 0 0 8px var(--accent-emerald);
+}
+
+.cloud-status.error .status-dot {
+  background: var(--accent-red);
 }
 
 /* Buttons */
@@ -899,11 +951,7 @@ body {
   
   .nav-actions {
     width: 100%;
-  }
-
-  .nav-actions .btn {
-    width: 100%;
-    justify-content: center;
+    justify-content: space-between;
   }
 
   .cards-grid {

@@ -1,5 +1,5 @@
 /**
- * Student Web Hub - Main Application Logic (Real-time Cloud Sync + Delete Feature)
+ * Student Web Hub - Main Application Logic (Real-time Cloud Sync + Status Indicator)
  */
 
 import { 
@@ -78,6 +78,7 @@ let cardsGrid, emptyState, searchInput, clearSearchBtn, categoryFilters, sortSel
 let registerModal, openRegisterModalBtn, closeModalBtn, cancelRegisterBtn, emptyStateBtn, registerForm, submitRegisterBtn, avatarPicker, selectedAvatarInput;
 let totalSitesCount, totalStudentsCount, totalLikesCount;
 let toast, toastMsg, toastIcon;
+let cloudStatus, cloudStatusText;
 
 // Global Window Helpers
 window.openRegisterModal = openModal;
@@ -123,6 +124,20 @@ function getDomElements() {
   toast = document.getElementById('toast');
   toastMsg = document.getElementById('toastMsg');
   toastIcon = document.getElementById('toastIcon');
+
+  cloudStatus = document.getElementById('cloudStatus');
+  cloudStatusText = document.getElementById('cloudStatusText');
+}
+
+/**
+ * Update Cloud Sync Status Indicator Badge
+ */
+function setCloudStatus(connected, message) {
+  if (!cloudStatus || !cloudStatusText) getDomElements();
+  if (!cloudStatus || !cloudStatusText) return;
+
+  cloudStatusText.textContent = message;
+  cloudStatus.className = 'cloud-status ' + (connected ? 'connected' : 'error');
 }
 
 /**
@@ -148,7 +163,8 @@ function initData() {
   if (isFirebaseEnabled && db) {
     try {
       onSnapshot(collection(db, "sites"), (snapshot) => {
-        console.log("☁️ Firestore Cloud snapshot updated. Doc count:", snapshot.size);
+        setCloudStatus(true, `☁️ 실시간 공유 연결됨 (${snapshot.size}개 등록)`);
+        
         const cloudSites = [];
         snapshot.forEach((docSnap) => {
           cloudSites.push({ id: docSnap.id, ...docSnap.data() });
@@ -160,17 +176,25 @@ function initData() {
           const mockTail = INITIAL_MOCK_DATA.filter(m => !cloudIds.has(m.id));
           
           sitesList = [...cloudSites, ...mockTail];
-          sitesList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-          
-          saveToLocalStorage();
-          renderApp();
+        } else {
+          sitesList = INITIAL_MOCK_DATA;
         }
+
+        sitesList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        saveToLocalStorage();
+        renderApp();
       }, (err) => {
-        console.error("⚠️ Firestore Cloud sync error (Permission rules check needed):", err);
+        console.error("⚠️ Firestore Cloud sync error:", err);
+        setCloudStatus(false, `⚠️ 파이어베이스 서버 연결 대기중`);
+        if (err.message && err.message.includes('permission-denied')) {
+          showToast(`⚠️ 파이어베이스 Rules 규칙 게시가 완료되면 실시간 공유가 시작됩니다.`, 'warning');
+        }
       });
     } catch (e) {
-      console.error("⚠️ Firestore collection error:", e);
+      setCloudStatus(false, `⚠️ 파이어베이스 설정 오류`);
     }
+  } else {
+    setCloudStatus(false, `⚡ 오프라인 저장소 모드`);
   }
 }
 
@@ -335,8 +359,10 @@ function handleFormSubmit(e) {
       createdAt: Date.now()
     }).then(docRef => {
       console.log("☁️ Firestore Cloud save SUCCESS, Document ID:", docRef.id);
+      showToast(`☁️ 수강생 전원 공유 서버에 저장되었습니다!`, 'success');
     }).catch(err => {
       console.error("⚠️ Firestore Cloud save ERROR:", err);
+      showToast(`⚠️ 파이어베이스 서버 저장 실패 (${err.code || err.message}).`, 'warning');
     });
   }
 
